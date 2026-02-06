@@ -160,6 +160,8 @@ summary(BATH_lmod2)
 
 
 #----------------Most significant variable vs price--------------
+
+# PropertySQFT is the most significant because its R^2 value is the largest out of the three models
 dataset <- NY_House_Dataset
 dataset <- dataset[dataset$PRICE<195000000,]
 dataset <- dataset[dataset$PROPERTYSQFT!=2184.207862,]
