@@ -1,0 +1,243 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+library("caret")
+library(GGally)
+library(psych)
+library("readr")
+setwd("C:/Users/willi/Documents/Data Analysis/Assignment 2")
+```
+
+
+```{r}
+epi <- read_csv("epi_results_2024_pop_gdp.csv")
+```
+
+```{r}
+var <- epi$EPI.new
+
+hist(var,
+     prob = TRUE,
+     main = "Histogram: EPI.new",
+     xlab = "EPI.new",
+     col = "lightblue",
+     border = "white")
+
+lines(density(var, na.rm = TRUE),
+      col = "red",
+      lwd = 2)
+```
+
+```{r}
+boxplot(EPI.new ~ region,
+        data = epi,
+        main = "EPI.new by Region",
+        xlab = "Region",
+        ylab = "EPI.new",
+        las = 2,
+        col = "orange")
+```
+
+```{r}
+r1 <- "Southern Asia"
+r2 <- "Latin America & Caribbean"
+
+epi_r1 <- subset(epi, region == r1)
+epi_r2 <- subset(epi, region == r2)
+
+par(mfrow = c(1, 2))
+
+hist(epi_r1$EPI.new,
+     prob = TRUE,
+     main = paste("Histogram of EPI.new:", r1),
+     xlab = "EPI.new",
+     col = "lightblue")
+
+lines(density(epi_r1$EPI.new, na.rm = TRUE), col = "red", lwd = 2)
+
+
+hist(epi_r2$EPI.new,
+     prob = TRUE,
+     main = paste("Histogram of EPI.new:", r2),
+     xlab = "EPI.new",
+     col = "lightgreen")
+
+lines(density(epi_r2$EPI.new, na.rm = TRUE), col = "red", lwd = 2)
+```
+
+```{r}
+qqplot(epi_r1$EPI.new,
+       epi_r2$EPI.new,
+       main = paste("Q-Q Plot of EPI.new\n", r1, "vs", r2),
+       xlab = r1,
+       ylab = r2,
+       col = "blue",
+       pch = 19)
+
+abline(0, 1, col = "red", lwd = 2)
+
+```
+
+```{r}
+plot(log(epi_r1$population), epi_r1$EPI.new,
+     main = paste("Population vs EPI.new -", r1),
+     xlab = "log(Population)", ylab = "EPI.new",
+     pch = 19, col = "blue")
+
+abline(lm(EPI.new ~ log(population), data = epi_r1),
+       col = "red", lwd = 2)
+```
+```{r}
+plot(log(epi_r1$gdp), epi_r1$EPI.new,
+     main = paste("GDP vs EPI.new -", r1),
+     xlab = "log(GDP)", ylab = "EPI.new",
+     pch = 19, col = "darkgreen")
+
+abline(lm(EPI.new ~ log(gdp), data = epi_r1),
+       col = "red", lwd = 2)
+```
+
+```{r}
+m1_r1 <- lm(EPI.new ~ log(gdp), data = epi_r1)
+
+m2_r1 <- lm(EPI.new ~ log(gdp) + log(population), data = epi_r1)
+
+summary(m1_r1)
+summary(m2_r1)
+
+par(mfrow = c(1,2))
+plot(m1_r1, which = 1, main = paste("Residuals - M1", r1))
+plot(m2_r1, which = 1, main = paste("Residuals - M2", r1))
+```
+
+
+```{r}
+m1_r2 <- lm(EPI.new ~ log(gdp), data = epi_r2)
+
+m2_r2 <- lm(EPI.new ~ log(gdp) + log(population), data = epi_r2)
+
+summary(m1_r2)
+summary(m2_r2)
+
+plot(m1_r2, which = 1, main = paste("Residuals - M1", r2))
+plot(m2_r2, which = 1, main = paste("Residuals - M2", r2))
+par(mfrow = c(1,1))
+```
+# -----------
+The model using both GDP and population as features for Southern Asia had the best results out of the four different models I tested. The results were:
+Residual standard error: 3.548 on 5 degrees of freedom
+Multiple R-squared:  0.777,	Adjusted R-squared:  0.6879
+
+Higher Adjusted R-squared and lower residual standard error.
+
+Therefore Southern Asia using GDP and population as features for the linear model is the best fit.
+
+```{r}
+unique(epi$region)
+
+regions_use <- c("Global West", "Eastern Europe", "Sub-Saharan Africa")
+
+df <- subset(epi, region %in% regions_use)
+```
+
+```{r}
+var_A <- "EPI.new" 
+var_B <- "ECO.new"
+
+df <- df[, c("region", "population", "gdp", var_A, var_B)]
+df <- na.omit(df)
+
+# recommended transforms for knn inputs
+df$log_pop <- log(df$population)
+df$log_gdp <- log(df$gdp)
+```
+
+```{r}
+set.seed(1)
+idx <- createDataPartition(df$region, p = 0.70, list = FALSE)
+train <- df[idx, ]
+test  <- df[-idx, ]
+```
+
+```{r}
+features_A <- c("log_pop", "log_gdp", var_A)
+features_B <- c("log_pop", "log_gdp", var_B)
+
+X_train_A <- train[, features_A]
+X_test_A  <- test[,  features_A]
+
+X_train_B <- train[, features_B]
+X_test_B  <- test[,  features_B]
+
+Y_train <- train$region
+Y_test  <- test$region
+Y_train <- factor(Y_train)
+Y_test  <- factor(Y_test, levels = levels(Y_train))
+
+```
+
+```{r}
+pp_A <- preProcess(X_train_A, method = c("center", "scale"))
+X_train_A_sc <- predict(pp_A, X_train_A)
+X_test_A_sc  <- predict(pp_A, X_test_A)
+
+pp_B <- preProcess(X_train_B, method = c("center", "scale"))
+X_train_B_sc <- predict(pp_B, X_train_B)
+X_test_B_sc  <- predict(pp_B, X_test_B)
+```
+
+```{r}
+k_values <- seq(1, 51, by = 2)
+acc_A <- numeric(length(k_values))
+
+for (i in seq_along(k_values)) {
+  k <- k_values[i]
+  m <- knn3(x = X_train_A_sc, y = Y_train, k = k)
+  p <- predict(m, X_test_A_sc, type = "class")
+  acc_A[i] <- mean(p == Y_test)
+}
+
+results_A <- data.frame(k = k_values, accuracy = acc_A)
+results_A[order(-results_A$accuracy), ][1:10, ]
+
+best_k <- results_A$k[which.max(results_A$accuracy)]
+best_k
+```
+
+```{r}
+model_A <- knn3(x = X_train_A_sc, y = Y_train, k = best_k)
+pred_A  <- predict(model_A, X_test_A_sc, type = "class")
+
+cm_A <- confusionMatrix(pred_A, Y_test)
+cm_A$table
+cm_A$overall["Accuracy"]
+```
+
+```{r}
+model_B <- knn3(x = X_train_B_sc, y = Y_train, k = best_k)
+pred_B  <- predict(model_B, X_test_B_sc, type = "class")
+
+cm_B <- confusionMatrix(pred_B, Y_test)
+cm_B$table
+cm_B$overall["Accuracy"]
+```
+#---------------------
+Model A achieved higher accuracy (87.5%) than Model B (75%) because EPI.new provides better separation between regions than ECO.new when combined with GDP and population. This results in countries from the same region being closer in the feature space, allowing kNN to classify observations more correctly.
+
+#EOF
